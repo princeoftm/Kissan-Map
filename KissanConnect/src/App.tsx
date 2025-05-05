@@ -2,14 +2,13 @@ import { useEffect, useState } from "react";
 import React from 'react';
 import ReactDOM from "react-dom";
 import Arweave from "arweave";
-import { createNft,mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata'
-import { createUmi } from '@metaplex-foundation/umi-bundle-defaults'
+import { createNft, mplTokenMetadata } from '@metaplex-foundation/mpl-token-metadata';
+import { createUmi } from '@metaplex-foundation/umi-bundle-defaults';
 import { createGenericFile, createSignerFromKeypair, generateSigner, keypairIdentity, percentAmount, sol } from '@metaplex-foundation/umi';
 import { mockStorage } from '@metaplex-foundation/umi-storage-mock';
 import * as fs from 'fs';
-import backgroundimage from "./pexels-kelly-1179532-2321837.jpg";
+import backgroundImage from "./pexels-kelly-1179532-2321837.jpg"; // Replace with your rural India image
 import { Outlet, Link } from "react-router-dom";
-
 import {
   BrowserRouter,
   Routes,
@@ -19,6 +18,7 @@ import Layout from "./pages/Layout";
 import Home from "./pages/Home";
 import Contact from "./pages/Contact";
 import User from "./pages/user";
+import Verify from "./pages/verify"; // Import the new Verify component
 import { chainConfig } from "./pages/config/config.js";
 import {
   Card,
@@ -37,34 +37,28 @@ import {
   InboxIcon,
   PowerIcon,
 } from "@heroicons/react/24/solid";
-import {app} from "./pages/config/config.js";
-// IMP START - Quick Start
+import { app } from "./pages/config/config.js";
 import { Web3Auth, decodeToken } from "@web3auth/single-factor-auth";
 import { ADAPTER_EVENTS, CHAIN_NAMESPACES, IProvider, WEB3AUTH_NETWORK } from "@web3auth/base";
 import { EthereumPrivateKeyProvider } from "@web3auth/ethereum-provider";
 import ImageUploading from 'react-images-uploading';
-// IMP END - Quick Start
 import Web3 from "web3";
 import {
-	SolanaPrivateKeyProvider,
-	SolanaWallet,
+  SolanaPrivateKeyProvider,
+  SolanaWallet,
 } from '@web3auth/solana-provider';
 import {
-	Connection,
-	Keypair,
-	LAMPORTS_PER_SOL,
-	PublicKey,
-	SystemProgram,
-	Transaction,
+  Connection,
+  Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SystemProgram,
+  Transaction,
   clusterApiUrl,
 } from '@solana/web3.js';
-
-// Firebase libraries for custom authentication
 import { initializeApp } from "firebase/app";
 import { GoogleAuthProvider, getAuth, signInWithPopup, UserCredential } from "firebase/auth";
-
 import "./App.css";
-
 import Container from 'react-bootstrap/Container';
 import Nav from 'react-bootstrap/Nav';
 import NavDropdown from 'react-bootstrap/NavDropdown';
@@ -73,71 +67,78 @@ import Checkout from "./pages/checkout";
 import Blogs from "./pages/Addproduct";
 import Cart from "./pages/Cart";
 import { CartProvider } from "./pages/CartContext";
-import { createMint, getOrCreateAssociatedTokenAccount, mintTo, setAuthority, transfer } from  "@solana/spl-token";
-// IMP START - SDK Initialization
-// IMP START - Dashboard Registration
-// IMP END - Dashboard Registration
-
-// IMP START - Verifier Creation
-const verifier = "authenticator";
-// IMP END - Verifier Creation
-
-
+import { createMint, getOrCreateAssociatedTokenAccount, mintTo, setAuthority, transfer } from "@solana/spl-token";
 
 function Navbar() {
+  const [linkHover, setLinkHover] = useState<{ [key: string]: boolean }>({});
+
   return (
-    <nav className="navbar">
-      <ul className="navbar-links">
-        <li><Link to="/">Home</Link></li>
-        <li><Link to="/blogs">Add a product here</Link></li>
-        <li><Link to="/contact">Contact</Link></li>
-        <li><Link to="/user">User</Link></li>
+    <nav style={{
+      background: '#4a704a',
+      padding: '0.75rem 1rem',
+      borderBottom: '1px solid #6b8e6b'
+    }}>
+      <ul style={{
+        display: 'flex',
+        listStyle: 'none',
+        margin: 0,
+        padding: 0,
+        gap: '1.5rem'
+      }}>
+        {['Home', 'verify', 'blogs', 'contact', 'user'].map((path) => (
+          <li key={path}>
+            <Link
+              to={path === 'Home' ? '/' : `/${path}`}
+              onMouseEnter={() => setLinkHover(prev => ({ ...prev, [path]: true }))}
+              onMouseLeave={() => setLinkHover(prev => ({ ...prev, [path]: false }))}
+              style={{
+                color: '#e8f5e8',
+                textDecoration: 'none',
+                fontSize: '1rem',
+                fontWeight: '500',
+                padding: '0.5rem 1rem',
+                borderRadius: '4px',
+                transition: 'all 0.2s',
+                ...(linkHover[path] && { background: '#6b8e6b', color: '#fff' })
+              }}
+            >
+              {path === 'blogs' ? 'Help' : path.charAt(0).toUpperCase() + path.slice(1)}
+            </Link>
+          </li>
+        ))}
       </ul>
     </nav>
   );
 }
+
 const privateKeyProvider = new SolanaPrivateKeyProvider({
   config: { chainConfig },
 });
 
 const web3auth = new Web3Auth({
-  clientId, // Get your Client ID from Web3Auth Dashboard
+  clientId,
   web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
   privateKeyProvider,
 });
 
-// IMP END - SDK Initialization
+const verifier = "authenticator";
 
-// IMP START - Auth Provider Login
-// Your web app's Firebase configuration
-
-// IMP END - Auth Provider Login
-async function mintNFt(){
-  const provider=web3auth.provider;
-  const solanaWallet = new SolanaWallet(provider!);
-
+async function mintNFt(hash?: string): Promise<string> {
+  const provider = web3auth.provider as IProvider;
+  const solanaWallet = new SolanaWallet(provider);
   const accounts = await solanaWallet.requestAccounts();
-
-  // Request connection configuration
   const connectionConfig: any = await solanaWallet.request({
     method: "solana_provider_config",
     params: [],
   });
-
-  // Create a new connection using the RPC target from the config
-  const connection = new Connection(connectionConfig.rpcTarget);
-
-  // Fetch the balance for the first account (public key)
+  const connection = new Connection(connectionConfig.rpcTarget as string);
   const balance = await connection.getBalance(new PublicKey(accounts[0]));
   if (balance === 0) {
     throw new Error("Insufficient balance: Balance is zero");
   }
-
-  // Proceed with NFT minting logic
-  console.log("Minting NFT...");
-  // Add your minting logic here
+  console.log("Minting NFT with hash:", hash || "No hash provided");
   const pubKey = await solanaWallet.requestAccounts();
-  console.log("pubkey",pubKey);
+  console.log("pubkey", pubKey);
   const { blockhash } = await connection.getLatestBlockhash("finalized");
   const TransactionInstruction = SystemProgram.transfer({
     fromPubkey: new PublicKey(pubKey[0]),
@@ -148,33 +149,40 @@ async function mintNFt(){
     recentBlockhash: blockhash,
     feePayer: new PublicKey(pubKey[0]),
   }).add(TransactionInstruction);
-  
+  if (hash) {
+    const memoInstruction = {
+      keys: [],
+      programId: new PublicKey("MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr"),
+      data: Buffer.from(hash, "utf8")
+    };
+    transaction.add(memoInstruction);
+  }
   const signedTx = await solanaWallet.signTransaction(transaction);
-  console.log(signedTx);
+  const txSignature = await connection.sendRawTransaction(signedTx.serialize());
+  await connection.confirmTransaction(txSignature, "confirmed");
+  console.log("Transaction signature:", txSignature);
+  return txSignature;
 }
 
 function App() {
   const [provider, setProvider] = useState<IProvider | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
-  const [balance, setBalance] = useState(0);  // Add state for balance
-  const [address,setAddress]=useState("");
-  const [images, setImages] = React.useState([]);
-  const [private_key,set_private_key]=useState("");
+  const [balance, setBalance] = useState(0);
+  const [address, setAddress] = useState("");
+  const [images, setImages] = useState<any[]>([]);
+  const [private_key, set_private_key] = useState("");
+  const [buttonHover, setButtonHover] = useState<{ [key: string]: boolean }>({});
 
-  // Firebase Initialisation
-  const onChange = (imageList:any , addUpdateIndex:any ) => {
-    // data for submit
+  const onChange = (imageList: any[], addUpdateIndex: number | undefined) => {
     console.log(imageList, addUpdateIndex);
     setImages(imageList);
   };
-    
 
   useEffect(() => {
     const init = async () => {
       try {
         await web3auth.init();
         setProvider(web3auth.provider);
-
         if (web3auth.status === ADAPTER_EVENTS.CONNECTED) {
           setLoggedIn(true);
         }
@@ -182,7 +190,6 @@ function App() {
         console.error(error);
       }
     };
-
     init();
   }, []);
 
@@ -199,23 +206,18 @@ function App() {
     }
   };
 
-
   const login = async () => {
     if (!web3auth) {
       return;
     }
-    // login with firebase
     const loginRes = await signInWithGoogle();
-    // get the id token from firebase
     const idToken = await loginRes.user.getIdToken(true);
-    const { payload } = decodeToken(idToken);
-
+    const { payload } = decodeToken(idToken) as { payload: { sub: string } };
     const web3authProvider = await web3auth.connect({
       verifier,
-      verifierId: (payload as any).sub,
+      verifierId: payload.sub,
       idToken,
     });
-
     if (web3authProvider) {
       setLoggedIn(true);
       setProvider(web3authProvider);
@@ -223,6 +225,7 @@ function App() {
     await getBalance();
     await getAccounts();
   };
+
   const arweave = Arweave.init({
     host: 'arweave.net',
     port: 443,
@@ -232,139 +235,285 @@ function App() {
   const getUserInfo = async () => {
     const user = await web3auth.getUserInfo();
   };
-  const getAccounts = async () => {
-		if (!web3auth) {
-			return;
-		}
-		const publicKey = await web3auth?.provider?.request({method: 'solanaPublicKey',});
-    setAddress(String(publicKey));
-    localStorage.setItem("address","0x"+String(publicKey));
 
+  const getAccounts = async () => {
+    if (!web3auth || !web3auth.provider) {
+      return;
+    }
+    const publicKey = await web3auth.provider.request({ method: 'solanaPublicKey' });
+    setAddress(String(publicKey));
+    localStorage.setItem("address", "0x" + String(publicKey));
   };
 
   const getBalance = async () => {
     if (!provider) {
-			return;
-		}
-		const solanaWallet = new SolanaWallet(provider);
-		// Get user's Solana public address
-		const accounts = await solanaWallet.requestAccounts();
-
-		const connectionConfig: any = await solanaWallet.request({
-			method: 'solana_provider_config',
-			params: [],
-		});
-
-		const connection = new Connection(connectionConfig.rpcTarget);
-
-		// Fetch the balance for the specified public key
-		const balance = await connection.getBalance(new PublicKey(accounts[0]));
-    setBalance(balance/LAMPORTS_PER_SOL);
-    localStorage.setItem("balance",String(balance));
-  };
-  const get_aidrop = async () => {
-    if (!provider) {
       return;
     }
-  
     const solanaWallet = new SolanaWallet(provider);
-  
-    // Get user's Solana public address
     const accounts = await solanaWallet.requestAccounts();
-    const publicKey = accounts[0]; // Solana public key
-  
     const connectionConfig: any = await solanaWallet.request({
       method: 'solana_provider_config',
       params: [],
     });
-  
-    const connection = new Connection(connectionConfig.rpcTarget);
-  
-    // Request an airdrop of 1 SOL (example value)
-    const solValue = 1; // You can change this value to the desired airdrop amount
-  
+    const connection = new Connection(connectionConfig.rpcTarget as string);
+    const balance = await connection.getBalance(new PublicKey(accounts[0]));
+    setBalance(balance / LAMPORTS_PER_SOL);
+    localStorage.setItem("balance", String(balance));
+  };
+
+  const get_aidrop = async () => {
+    if (!provider) {
+      return;
+    }
+    const solanaWallet = new SolanaWallet(provider);
+    const accounts = await solanaWallet.requestAccounts();
+    const publicKey = accounts[0];
+    const connectionConfig: any = await solanaWallet.request({
+      method: 'solana_provider_config',
+      params: [],
+    });
+    const connection = new Connection(connectionConfig.rpcTarget as string);
+    const solValue = 1;
     try {
       const fromAirDropSignature = await connection.requestAirdrop(
-        new PublicKey(publicKey), // User's public key
-        solValue * LAMPORTS_PER_SOL // Convert SOL to lamports
+        new PublicKey(publicKey),
+        solValue * LAMPORTS_PER_SOL
       );
-  
       await connection.confirmTransaction(fromAirDropSignature);
     } catch (error) {
       console.error('Airdrop failed', error);
     }
   };
-  
+
   const logout = async () => {
     await web3auth.logout();
     setProvider(null);
     setLoggedIn(false);
   };
 
+  const buttonBaseStyle = {
+    padding: '0.75rem 1.5rem',
+    borderRadius: '8px',
+    border: 'none',
+    background: '#6b8e6b',
+    color: 'white',
+    fontSize: '0.875rem',
+    fontWeight: '500' as const,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    width: '100%',
+    textAlign: 'center' as const
+  };
 
-
+  const buttonHoverStyle = {
+    background: '#558855',
+    boxShadow: '0 4px 8px rgba(0,0,0,0.15)'
+  };
 
   const loggedInView = (
     <>
-      <div className="flex-container">
-        <div>
-        <BrowserRouter>
-      <Navbar />
-      <CartProvider>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Home />} />
-          <Route path="blogs" element={<Blogs />} />
-          <Route path="contact" element={<Contact />} />
-          <Route path="user" element={<User />} />
-          <Route path="/checkout" element={<Checkout />} />  {/* Checkout page */}
-          <Route path="/cart" element={<Cart />} />  {/* Cart page */}
-
-        </Route>
-      </Routes>
-      </CartProvider>
-    </BrowserRouter>
+      <div style={{ minHeight: 'calc(100vh - 6rem)' }}>
+        <div style={{
+          background: '#3e5a3e',
+          padding: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          borderBottom: '1px solid #a3bffa'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            background: '#6b8e6b',
+            borderRadius: '50%',
+            marginRight: '1rem'
+          }} />
+          <h1 style={{
+            fontSize: '1.75rem',
+            fontWeight: '700',
+            color: '#e8f5e8',
+            margin: 0
+          }}>
+            KissanMap
+          </h1>
         </div>
-        <div>
-        <div className="sidebar">
-        <button onClick={logout} className="sidebar-item">Log Out</button>
-        <button onClick={getUserInfo} className="sidebar-item">Get User Info</button>
-        <button onClick={get_aidrop} className="sidebar-item">Get Airdrop</button>
-        <div className="balance-container">
-        <button onClick={getBalance} className="sidebar-item">Get Balance</button>
-          {balance !== null && <span className="balance-display">Balance: {balance} SOL</span>}
+        <div style={{ display: 'flex', minHeight: 'calc(100vh - 6rem)' }}>
+          <div style={{ flex: 1, padding: '2rem' }}>
+            <BrowserRouter>
+              <Navbar />
+              <CartProvider>
+                <Routes>
+                  <Route path="/" element={<Layout />}>
+                    <Route index element={<Home />} />
+                    <Route path="verify" element={<Verify />} /> {/* New route for verify */}
+                    <Route path="blogs" element={<Blogs />} />
+                    <Route path="contact" element={<Contact />} />
+                    <Route path="user" element={<User />} />
+                    <Route path="/checkout" element={<Checkout />} />
+                    <Route path="/cart" element={<Cart />} />
+                  </Route>
+                </Routes>
+              </CartProvider>
+            </BrowserRouter>
+          </div>
+          <div style={{ width: '250px', background: '#4a704a', color: '#e8f5e8', padding: '1rem', boxShadow: '-2px 0 5px rgba(0,0,0,0.2)' }}>
+            <button
+              onClick={logout}
+              onMouseEnter={() => setButtonHover(prev => ({ ...prev, logout: true }))}
+              onMouseLeave={() => setButtonHover(prev => ({ ...prev, logout: false }))}
+              style={{
+                ...buttonBaseStyle,
+                ...(buttonHover.logout ? buttonHoverStyle : {})
+              }}
+            >
+              Log Out
+            </button>
+            <button
+              onClick={get_aidrop}
+              onMouseEnter={() => setButtonHover(prev => ({ ...prev, airdrop: true }))}
+              onMouseLeave={() => setButtonHover(prev => ({ ...prev, airdrop: false }))}
+              style={{
+                ...buttonBaseStyle,
+                marginTop: '0.75rem',
+                ...(buttonHover.airdrop ? buttonHoverStyle : {})
+              }}
+            >
+              Get Airdrop
+            </button>
+            <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button
+                onClick={getBalance}
+                onMouseEnter={() => setButtonHover(prev => ({ ...prev, balance: true }))}
+                onMouseLeave={() => setButtonHover(prev => ({ ...prev, balance: false }))}
+                style={{
+                  ...buttonBaseStyle,
+                  ...(buttonHover.balance ? buttonHoverStyle : {})
+                }}
+              >
+                Get Balance
+              </button>
+              {balance !== null && (
+                <span style={{
+                  fontSize: '0.875rem',
+                  color: '#2f4f2f',
+                  textAlign: 'center' as const,
+                  padding: '0.5rem',
+                  background: '#e8f5e8',
+                  borderRadius: '8px',
+                  display: 'block',
+                  marginTop: '0.5rem'
+                }}>
+                  Balance: {balance} SOL
+                </span>
+              )}
+            </div>
+            <div style={{ marginTop: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <button
+                onClick={getAccounts}
+                onMouseEnter={() => setButtonHover(prev => ({ ...prev, accounts: true }))}
+                onMouseLeave={() => setButtonHover(prev => ({ ...prev, accounts: false }))}
+                style={{
+                  ...buttonBaseStyle,
+                  ...(buttonHover.accounts ? buttonHoverStyle : {})
+                }}
+              >
+                Get Public Key
+              </button>
+              {address && (
+                <span style={{
+                  fontSize: '0.875rem',
+                  color: '#2f4f2f',
+                  textAlign: 'center' as const,
+                  padding: '0.5rem',
+                  background: '#e8f5e8',
+                  borderRadius: '8px',
+                  display: 'block',
+                  marginTop: '0.5rem',
+                  wordBreak: 'break-all'
+                }}>
+                  Address: 0x{address}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="balance-container">
-        <button onClick={getAccounts} className="sidebar-item">Get Public Key</button>
-          {balance !== null && <span className="balance-display">Address: {"0x"+address}</span>}
-        </div>
-        </div>
-        </div>    
-    </div>
+      </div>
     </>
   );
 
   const unloggedInView = (
-    <body>
-    <h1 className="center-text">KISK</h1>
-    <button  onClick={login} className="card" id="login-btn">
-      Login
-    </button>
-    </body>
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #c6e2c6,rgb(163, 250, 206))',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '2rem',
+      position: 'relative'
+    }}>
+      <div style={{
+        maxWidth: '1200px',
+        width: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        background: 'white',
+        borderRadius: '12px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        overflow: 'hidden',
+        height: '70vh'
+      }}>
+        <div style={{
+          width: '50%',
+          padding: '2rem',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <span style={{ fontSize: '1.5rem', color: '#6b8e6b', marginBottom: '1rem' }}>KissanMap</span>
+          <h1 style={{
+            fontSize: '2.5rem',
+            fontWeight: '700',
+            color: '#2f4f2f',
+            marginBottom: '1rem',
+            textAlign: 'center' as const
+          }}>
+            Welcome to KissanMap,<br />a land platform for rural India.
+          </h1>
+          <button
+            onClick={login}
+            id="login-btn"
+            onMouseEnter={() => setButtonHover(prev => ({ ...prev, login: true }))}
+            onMouseLeave={() => setButtonHover(prev => ({ ...prev, login: false }))}
+            style={{
+              ...buttonBaseStyle,
+              padding: '1rem 2rem',
+              fontSize: '1.25rem',
+              ...(buttonHover.login ? buttonHoverStyle : {})
+            }}
+          >
+            Login
+          </button>
+        </div>
+        <div style={{
+          width: '50%',
+          height: '100%',
+          backgroundImage: `url(${backgroundImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          position: 'relative'
+        }} />
+      </div>
+    </div>
   );
 
   return (
-    <div className="container">
-      <h1 className="title">
-        <a target="_blank" rel="noreferrer">
-        Kissanconnect
-        </a>{" "}
-      </h1>
-
-      <div className="grid">{loggedIn ? loggedInView : unloggedInView}</div>
-
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #c6e2c6, #a3bffa)' }}>
+      {loggedIn ? loggedInView : unloggedInView}
     </div>
   );
 }
-export { web3auth,mintNFt};
+
+export { web3auth, mintNFt };
 export default App;
