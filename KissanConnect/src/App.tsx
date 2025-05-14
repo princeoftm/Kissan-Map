@@ -9,6 +9,7 @@ import { mockStorage } from '@metaplex-foundation/umi-storage-mock';
 import * as fs from 'fs';
 import backgroundImage from "./pexels-kelly-1179532-2321837.jpg"; // Replace with your rural India image
 import { Outlet, Link } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react"
 import {
   BrowserRouter,
   Routes,
