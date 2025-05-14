@@ -496,6 +496,8 @@ function App() {
           >
             Login
           </button>
+
+          <Analytics />
         </div>
         <div style={{
           width: '50%',
